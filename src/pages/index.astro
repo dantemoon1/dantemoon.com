@@ -25,7 +25,7 @@ const barRects = bars.map((w, i) => {
     <meta name="description" content={site.description} />
   </head>
   <body>
-    <main class="receipt" data-flash="hidden">
+    <main class="receipt">
       <header>
         <p class="brand">{site.domain}</p>
         <p>Thank you for stopping by.</p>
@@ -100,7 +100,7 @@ const barRects = bars.map((w, i) => {
 
     <div class="stage">
     <figure class="display" aria-hidden="true">
-      <div class="screen" data-flash="hidden">
+      <div class="screen">
         <canvas class="display-canvas"></canvas>
       </div>
     </figure>
@@ -331,13 +331,17 @@ const barRects = bars.map((w, i) => {
       const REFRESH_MS = 420;
       let active = '';
       let drawToken = 0;
+      let drawn = false;
 
       async function render(slide: Slide | 'now') {
         const token = ++drawToken;
         const img = slide === 'now' ? await buildCollage() : await load(slide.image);
         if (token !== drawToken) return;
         // partial refresh: the old image inverts, then the new one is drawn
-        display.classList.add('flicker');
+        // (the very first image is drawn straight away)
+        const first = !drawn;
+        drawn = true;
+        if (!first) display.classList.add('flicker');
         setTimeout(() => {
           if (token !== drawToken) return;
           if (slide === 'now') {
@@ -349,7 +353,7 @@ const barRects = bars.map((w, i) => {
             setCaption(String(i + 1).padStart(2, '0'), slide.name, slide.detail, { url: slide.url, label: slide.host });
           }
           display.classList.remove('flicker');
-        }, REFRESH_MS);
+        }, first ? 0 : REFRESH_MS);
       }
 
       function select(key: string) {
@@ -384,18 +388,6 @@ const barRects = bars.map((w, i) => {
         select(key);
       });
 
-      // E-ink refresh on load, pane by pane: the receipt, then the display's screen.
-      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const steps: [string, number][] = reduce
-        ? [['done', 0]]
-        : [['invert', 650], ['black', 450], ['white', 450], ['black', 350], ['white', 500], ['done', 0]];
-      document.querySelectorAll<HTMLElement>('[data-flash]').forEach((pane, n) => {
-        let t = reduce ? 0 : n * 350;
-        for (const [state, ms] of steps) {
-          setTimeout(() => (pane.dataset.flash = state), t);
-          t += ms;
-        }
-      });
     </script>
   </body>
 </html>
@@ -493,13 +485,6 @@ const barRects = bars.map((w, i) => {
   footer { text-align: center; }
   .barcode { width: 70%; height: 44px; margin: 1.5rem auto 0.5rem; display: block; fill: var(--ink); }
 
-  /* the refresh flash */
-  [data-flash] { position: relative; }
-  [data-flash]::after { content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; }
-  [data-flash='hidden'] { visibility: hidden; }
-  [data-flash='invert'] { filter: invert(1); }
-  [data-flash='black']::after { background: #111; }
-  [data-flash='white']::after { background: #f4f3ef; }
 
   .stage { display: none; }
 

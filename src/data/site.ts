@@ -23,7 +23,7 @@ export const projects = [
     url: 'https://tryaftershow.com',
     host: 'tryaftershow.com',
     blurb: 'Feedback from every home showing, automatically.',
-    detail: "Aftershow follows up with buyer's agents after every home showing, collects their feedback, and hands listing agents an update for their seller. I build and run all of it.",
+    detail: "Aftershow follows up with buyer's agents after every home showing, collects their feedback, and hands listing agents an update for their seller.",
     image: '/shots/aftershow.jpg',
     crop: [0.07, 0.13, 0.42, 0.24],
   },
