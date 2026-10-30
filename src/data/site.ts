@@ -3,6 +3,8 @@ export const site = {
   name: 'Dante Moon',
   now: 'Data scientist at Optum. MCS student at UIUC. Living in Chicago.',
   description: 'Dante Moon: data scientist, builder, Chicago.',
+  // shown under the display when "Now" is hovered
+  bio: 'Data scientist at Optum, building models that read clinical notes. Master of Computer Science student at UIUC. Building products on the side, in Chicago.',
 };
 
 // Hovering "Now" lays these out together on the display, like things pinned to a board.
@@ -21,6 +23,7 @@ export const projects = [
     url: 'https://tryaftershow.com',
     host: 'tryaftershow.com',
     blurb: 'Feedback from every home showing, automatically.',
+    detail: "Aftershow follows up with buyer's agents after every home showing, collects their feedback, and hands listing agents an update for their seller. I build and run all of it.",
     image: '/shots/aftershow.jpg',
     crop: [0.07, 0.13, 0.42, 0.24],
   },
@@ -29,6 +32,7 @@ export const projects = [
     url: 'https://blockyourapps.com',
     host: 'blockyourapps.com',
     blurb: 'Your AI agent blocks the apps that eat your day.',
+    detail: 'An app blocker for Instagram, TikTok and YouTube that your AI agent can switch on for you, before the afternoon disappears.',
     image: '/shots/blockyourapps.jpg',
     crop: [0.08, 0.33, 0.84, 0.28],
   },
@@ -37,6 +41,7 @@ export const projects = [
     url: 'https://github.com/dantemoon1/lofi-newtab',
     host: 'github.com/dantemoon1',
     blurb: 'A calm new tab: lofi video, clock, pomodoro.',
+    detail: 'A Chrome new tab page with a lofi YouTube background, a clean clock, weather and a pomodoro timer that stays in sync across tabs.',
     image: '/shots/lofi.jpg',
     crop: [0, 0, 1, 1],
   },

@@ -24,8 +24,8 @@ const barRects = bars.map((w, i) => {
     <title>{site.name}</title>
     <meta name="description" content={site.description} />
   </head>
-  <body class="refreshing">
-    <main class="receipt">
+  <body>
+    <main class="receipt" data-flash="hidden">
       <header>
         <p class="brand">{site.domain}</p>
         <p>Thank you for stopping by.</p>
@@ -98,16 +98,24 @@ const barRects = bars.map((w, i) => {
       </footer>
     </main>
 
+    <div class="stage">
     <figure class="display" aria-hidden="true">
-      <div class="screen">
+      <div class="screen" data-flash="hidden">
         <canvas class="display-canvas"></canvas>
       </div>
     </figure>
+    <div class="caption" aria-live="polite">
+      <p class="caption-kicker"></p>
+      <p class="caption-title"></p>
+      <p class="caption-body"></p>
+      <a class="caption-link" target="_blank" rel="noopener"></a>
+    </div>
+    </div>
 
     <script type="application/json" id="projects" set:html={JSON.stringify(projects)} />
     <script type="application/json" id="now-collage" set:html={JSON.stringify(nowCollage)} />
+    <script type="application/json" id="site" set:html={JSON.stringify(site)} />
 
-    <div class="flash" aria-hidden="true"></div>
 
     <script>
       // "Printed" timestamp in Chicago time.
@@ -256,7 +264,7 @@ const barRects = bars.map((w, i) => {
 
       // Desktop: an e-ink display beside the receipt. Hovering a project shows it;
       // hovering "Now" shows Chicago, Optum and UIUC together as a collage.
-      type Slide = { name: string; host: string; image: string; crop?: number[]; fit?: string };
+      type Slide = { name: string; host: string; url: string; detail: string; image: string; crop?: number[]; fit?: string };
       const projects: Slide[] = JSON.parse(document.getElementById('projects')!.textContent!);
       type Collage = {
         items: { image: string; x: number; y: number; w: number; rotate: number; invert?: boolean }[];
@@ -306,6 +314,20 @@ const barRects = bars.map((w, i) => {
       const display = document.querySelector<HTMLElement>('.display')!;
       const screen = display.querySelector<HTMLCanvasElement>('.display-canvas')!;
       const nowSection = document.querySelector<HTMLElement>('.now')!;
+      const siteInfo = JSON.parse(document.getElementById('site')!.textContent!);
+      const caption = document.querySelector<HTMLElement>('.caption')!;
+
+      function setCaption(kicker: string, title: string, body: string, link?: { url: string; label: string }) {
+        caption.querySelector('.caption-kicker')!.textContent = kicker;
+        caption.querySelector('.caption-title')!.textContent = title;
+        caption.querySelector('.caption-body')!.textContent = body;
+        const a = caption.querySelector<HTMLAnchorElement>('.caption-link')!;
+        a.hidden = !link;
+        if (link) {
+          a.href = link.url;
+          a.textContent = `${link.label} ↗`;
+        }
+      }
       const REFRESH_MS = 420;
       let active = '';
       let drawToken = 0;
@@ -318,8 +340,14 @@ const barRects = bars.map((w, i) => {
         display.classList.add('flicker');
         setTimeout(() => {
           if (token !== drawToken) return;
-          if (slide === 'now') dither(screen, img, undefined, ASPECT);
-          else dither(screen, img, slide.crop, ASPECT, SCALE, slide);
+          if (slide === 'now') {
+            dither(screen, img, undefined, ASPECT);
+            setCaption('Now', siteInfo.name, siteInfo.bio);
+          } else {
+            dither(screen, img, slide.crop, ASPECT, SCALE, slide);
+            const i = projects.indexOf(slide);
+            setCaption(String(i + 1).padStart(2, '0'), slide.name, slide.detail, { url: slide.url, label: slide.host });
+          }
           display.classList.remove('flicker');
         }, REFRESH_MS);
       }
@@ -356,19 +384,18 @@ const barRects = bars.map((w, i) => {
         select(key);
       });
 
-      // E-ink full refresh on load: inverted, black, white, then the page.
+      // E-ink refresh on load, pane by pane: the receipt, then the display's screen.
       const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
       const steps: [string, number][] = reduce
         ? [['done', 0]]
         : [['invert', 650], ['black', 450], ['white', 450], ['black', 350], ['white', 500], ['done', 0]];
-      let t = 0;
-      for (const [state, ms] of steps) {
-        setTimeout(() => {
-          document.body.dataset.flash = state;
-          if (state === 'done') document.body.classList.remove('refreshing');
-        }, t);
-        t += ms;
-      }
+      document.querySelectorAll<HTMLElement>('[data-flash]').forEach((pane, n) => {
+        let t = reduce ? 0 : n * 350;
+        for (const [state, ms] of steps) {
+          setTimeout(() => (pane.dataset.flash = state), t);
+          t += ms;
+        }
+      });
     </script>
   </body>
 </html>
@@ -467,14 +494,14 @@ const barRects = bars.map((w, i) => {
   .barcode { width: 70%; height: 44px; margin: 1.5rem auto 0.5rem; display: block; fill: var(--ink); }
 
   /* the refresh flash */
-  .flash { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
-  body[data-flash='invert'] { filter: invert(1); }
-  body[data-flash='black'] .flash { background: #111; }
-  body[data-flash='white'] .flash { background: #f4f3ef; }
-  body.refreshing :is(.receipt, .display) { visibility: hidden; }
-  body[data-flash='invert'] :is(.receipt, .display) { visibility: visible; }
+  [data-flash] { position: relative; }
+  [data-flash]::after { content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; }
+  [data-flash='hidden'] { visibility: hidden; }
+  [data-flash='invert'] { filter: invert(1); }
+  [data-flash='black']::after { background: #111; }
+  [data-flash='white']::after { background: #f4f3ef; }
 
-  .display { display: none; }
+  .stage { display: none; }
 
   /* Desktop: text-only receipt with the e-ink display beside it */
   @media (min-width: 1040px) {
@@ -495,8 +522,9 @@ const barRects = bars.map((w, i) => {
     .now.selected { background: var(--ink); color: var(--paper); }
     .item.selected .host, .item.selected .leader { color: var(--paper); border-color: var(--paper); }
 
+    .stage { display: block; flex: 1; max-width: 64rem; margin: 0 auto; }
     .display {
-      display: block; margin: 0 auto; flex: 1; max-width: 64rem;
+      display: block; margin: 0;
       padding: 1.4rem; background: #ecebe6; border-radius: 10px;
       box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08), 0 18px 40px -18px rgb(0 0 0 / 0.35);
     }
@@ -506,6 +534,14 @@ const barRects = bars.map((w, i) => {
     }
     .display-canvas { display: block; width: 100%; image-rendering: pixelated; border: 1.5px solid var(--ink); }
     .display.flicker .screen { filter: invert(1); }
+
+    /* fixed height, so switching projects never moves anything */
+    .caption { height: 9.5rem; margin-top: 1.75rem; padding: 0 0.25rem; max-width: 40rem; }
+    .caption-kicker { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+    .caption-title { font-size: 1.5rem; font-weight: 600; letter-spacing: -0.01em; margin: 0.1rem 0 0.4rem; }
+    .caption-body { line-height: 1.55; }
+    .caption-link { display: inline-block; margin-top: 0.5rem; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+    .caption-link:hover { background: var(--ink); color: var(--paper); }
   }
 
   @media (max-width: 480px) {
