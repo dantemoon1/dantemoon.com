@@ -28,7 +28,7 @@ const barRects = bars.map((w, i) => {
     <main class="receipt">
       <header>
         <p class="brand">{site.domain}</p>
-        <p>Thank you for stopping by.</p>
+        <p>Chicago, IL</p>
         <p class="printed">Printed <span id="printed">today</span></p>
       </header>
 
@@ -90,11 +90,12 @@ const barRects = bars.map((w, i) => {
       <p class="stars" aria-hidden="true">*&nbsp;&nbsp;&nbsp;*&nbsp;&nbsp;&nbsp;*</p>
 
       <footer>
-        <p>Thank you for your business.</p>
-        <p>{site.domain}</p>
+        <p>Thanks for stopping by.</p>
+        <p>Have a great day :)</p>
         <svg class="barcode" viewBox={`0 0 ${bx} 10`} preserveAspectRatio="none" aria-hidden="true">
           {barRects.filter((r) => r.fill).map((r) => <rect x={r.x} width={r.w} height="10" />)}
         </svg>
+        <p class="order-no" id="order-no"></p>
       </footer>
     </main>
 
@@ -128,6 +129,20 @@ const barRects = bars.map((w, i) => {
         hour: 'numeric',
         minute: '2-digit',
       }) + ' CT';
+
+      // Order number from the visit's date and time in Chicago, e.g. DM-20261030-1338.
+      const part = (type: string) =>
+        new Intl.DateTimeFormat('en-US', {
+          timeZone: 'America/Chicago',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hourCycle: 'h23',
+        }).formatToParts(new Date()).find((p) => p.type === type)!.value;
+      document.getElementById('order-no')!.textContent =
+        `DM-${part('year')}${part('month')}${part('day')}-${part('hour')}${part('minute')}`;
 
       // Atkinson dithering, the classic 1-bit look of e-ink and early Macs.
       const INK = [42, 42, 40];
@@ -483,6 +498,7 @@ const barRects = bars.map((w, i) => {
 
   .stars { text-align: center; margin: 2rem 0 1.5rem; font-size: 1.1rem; }
   footer { text-align: center; }
+  .order-no { font-size: 0.75rem; letter-spacing: 0.2em; color: var(--faint); }
   .barcode { width: 70%; height: 44px; margin: 1.5rem auto 0.5rem; display: block; fill: var(--ink); }
 
 
@@ -501,7 +517,8 @@ const barRects = bars.map((w, i) => {
     .items { gap: 1rem; }
     hr { margin: 1.15rem 0; }
     .stars { margin: 1.25rem 0 1rem; }
-    .barcode { margin-top: 0.75rem; height: 30px; }
+    .order-no { font-size: 0.75rem; letter-spacing: 0.2em; color: var(--faint); }
+  .barcode { margin-top: 0.75rem; height: 30px; }
     .item.selected { background: var(--ink); color: var(--paper); }
     .now { padding: 0.5rem; margin: -0.5rem; outline: none; cursor: default; }
     .now.selected { background: var(--ink); color: var(--paper); }
