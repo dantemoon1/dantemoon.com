@@ -1,16 +1,110 @@
 ---
+import { site, projects, links } from '../data/site';
 ---
 
 <html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{site.name}</title>
+    <meta name="description" content={site.tagline} />
+    <meta property="og:title" content={site.name} />
+    <meta property="og:description" content={site.tagline} />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>{site.name}</h1>
+        <p class="muted">{site.location}</p>
+        <p class="tagline">{site.tagline}</p>
+      </header>
+
+      <section aria-labelledby="about">
+        <h2 id="about">About</h2>
+        {site.bio.map((p) => <p>{p}</p>)}
+      </section>
+
+      <section aria-labelledby="projects">
+        <h2 id="projects">Projects</h2>
+        <ul class="projects">
+          {
+            projects.map((p) => (
+              <li>
+                <a href={p.url}>{p.name}</a>
+                <span class="muted">{p.description}</span>
+              </li>
+            ))
+          }
+        </ul>
+      </section>
+
+      <section aria-labelledby="links">
+        <h2 id="links">Elsewhere</h2>
+        <ul class="links">
+          {links.map((l) => <li><a href={l.url}>{l.label}</a></li>)}
+        </ul>
+      </section>
+    </main>
+  </body>
 </html>
+
+<style is:global>
+  :root {
+    color-scheme: light dark;
+    --bg: #fbfaf8;
+    --fg: #1b1b1a;
+    --muted: #6b6a66;
+    --accent: #3d5afe;
+    --rule: #e6e4df;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111110;
+      --fg: #ecebe8;
+      --muted: #9a9993;
+      --accent: #8c9eff;
+      --rule: #2a2a28;
+    }
+  }
+  * { box-sizing: border-box; }
+  html {
+    background: var(--bg);
+    color: var(--fg);
+    font: 17px/1.6 ui-sans-serif, system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { margin: 0; }
+  main {
+    max-width: 38rem;
+    margin: 0 auto;
+    padding: 6rem 1.5rem 4rem;
+  }
+  h1 { font-size: 2rem; letter-spacing: -0.02em; margin: 0; line-height: 1.2; }
+  h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    font-weight: 600;
+    margin: 0 0 1rem;
+  }
+  header { margin-bottom: 3rem; }
+  header .muted { margin: 0.25rem 0 1rem; }
+  .tagline { font-size: 1.15rem; margin: 0; }
+  section { border-top: 1px solid var(--rule); padding: 2rem 0; }
+  p { margin: 0 0 1rem; }
+  .muted { color: var(--muted); }
+  a {
+    color: var(--fg);
+    text-decoration: underline;
+    text-decoration-color: var(--rule);
+    text-underline-offset: 3px;
+    transition: text-decoration-color 0.15s;
+  }
+  a:hover { text-decoration-color: var(--accent); }
+  ul { list-style: none; padding: 0; margin: 0; }
+  .projects li { display: flex; flex-direction: column; margin-bottom: 1.25rem; }
+  .projects a { font-weight: 600; }
+  .links { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+</style>
