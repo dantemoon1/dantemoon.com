@@ -43,7 +43,7 @@ const barRects = bars.map((w, i) => {
       <hr />
 
       <section>
-        <h2>Items shipped</h2>
+        <h2>Made to order</h2>
         <ol class="items">
           {
             projects.map((p, i) => (
@@ -63,7 +63,7 @@ const barRects = bars.map((w, i) => {
           }
         </ol>
         <p class="total">
-          <span>Total items</span>
+          <span>Order total</span>
           <span class="leader" aria-hidden="true"></span>
           <span>{projects.length}</span>
         </p>
@@ -268,7 +268,7 @@ const barRects = bars.map((w, i) => {
           display.querySelector('.display-host')!.textContent = p.host;
           display.querySelector('.display-count')!.textContent = `${i + 1}/${projects.length}`;
           display.classList.remove('flicker');
-        }, 120);
+        }, 260);
         document.querySelectorAll('.item').forEach((el, j) => el.classList.toggle('selected', j === i));
       }
 
@@ -298,7 +298,7 @@ const barRects = bars.map((w, i) => {
       const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
       const steps: [string, number][] = reduce
         ? [['done', 0]]
-        : [['invert', 140], ['black', 110], ['white', 110], ['done', 0]];
+        : [['invert', 380], ['black', 260], ['white', 260], ['black', 200], ['white', 300], ['done', 0]];
       let t = 0;
       for (const [state, ms] of steps) {
         setTimeout(() => {
@@ -417,8 +417,8 @@ const barRects = bars.map((w, i) => {
   /* Desktop: text-only receipt with the e-ink display beside it */
   @media (min-width: 1040px) {
     body {
-      display: flex; align-items: center; justify-content: center; gap: 4rem;
-      padding: 2.5rem 2rem;
+      display: flex; align-items: center; gap: 4rem;
+      padding: 2.5rem 4rem 2.5rem 3rem;
     }
     .receipt { margin: 0; padding: 1.75rem 2rem 1.5rem; max-width: none; width: 34rem; flex-shrink: 0; }
     .receipt .dither, .receipt .host { display: none; }
@@ -432,8 +432,8 @@ const barRects = bars.map((w, i) => {
     .item.selected .host, .item.selected .leader { color: var(--paper); border-color: var(--paper); }
 
     .display {
-      display: block; margin: 0; width: 28rem; flex-shrink: 0;
-      padding: 1.1rem; background: #ecebe6; border-radius: 10px;
+      display: block; margin: 0 auto; flex: 1; max-width: 64rem;
+      padding: 1.4rem; background: #ecebe6; border-radius: 10px;
       box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08), 0 18px 40px -18px rgb(0 0 0 / 0.35);
     }
     .screen {
@@ -446,7 +446,7 @@ const barRects = bars.map((w, i) => {
       border-bottom: 1.5px solid var(--ink); padding-bottom: 0.6rem; margin-bottom: 1rem;
     }
     .display-canvas { display: block; width: 100%; image-rendering: pixelated; border: 1.5px solid var(--ink); }
-    .display-name { font-weight: 600; font-size: 1.15rem; margin-top: 0.75rem; }
+    .display-name { font-weight: 600; font-size: 1.4rem; margin-top: 1rem; }
     .display-host { color: var(--faint); font-size: 0.8rem; }
     .display.flicker .screen { filter: invert(1); }
   }
