@@ -1,7 +1,7 @@
 ---
 import '@fontsource/ibm-plex-mono/400.css';
 import '@fontsource/ibm-plex-mono/600.css';
-import { site, projects, contact } from '../data/site';
+import { site, nowCollage, projects, contact } from '../data/site';
 
 // A receipt-style barcode: bar widths come from the domain's characters.
 const bars = [...site.domain].flatMap((c) => {
@@ -34,7 +34,7 @@ const barRects = bars.map((w, i) => {
 
       <hr />
 
-      <section>
+      <section class="now" tabindex="0">
         <h2>Now</h2>
         <p class="name">{site.name}</p>
         <p>{site.now}</p>
@@ -108,6 +108,7 @@ const barRects = bars.map((w, i) => {
     </figure>
 
     <script type="application/json" id="projects" set:html={JSON.stringify(projects)} />
+    <script type="application/json" id="now-collage" set:html={JSON.stringify(nowCollage)} />
 
     <div class="flash" aria-hidden="true"></div>
 
@@ -137,6 +138,7 @@ const barRects = bars.map((w, i) => {
         crop = [0, 0, 1, 1],
         aspect?: number,
         scale = SCALE,
+        opts: { fit?: string; tone?: string } = {},
       ) {
         const iw = img instanceof HTMLImageElement ? img.naturalWidth : img.width;
         const ih = img instanceof HTMLImageElement ? img.naturalHeight : img.height;
@@ -156,11 +158,21 @@ const barRects = bars.map((w, i) => {
           sy = Math.min(Math.max(my - sh / 2, 0), ih - sh);
         }
         const w = Math.round(canvas.clientWidth / scale);
-        const h = Math.round((w * sh) / sw);
+        const h = Math.round(opts.fit === 'contain' && aspect ? w / aspect : (w * sh) / sw);
         canvas.width = w;
         canvas.height = h;
         const ctx = canvas.getContext('2d')!;
-        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, w, h);
+        if (opts.tone) ctx.filter = opts.tone;
+        if (opts.fit === 'contain') {
+          // a logo: whole, centered, with room around it
+          const k = Math.min((w * 0.7) / iw, (h * 0.7) / ih);
+          ctx.drawImage(img, (w - iw * k) / 2, (h - ih * k) / 2, iw * k, ih * k);
+        } else {
+          ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+        }
+        ctx.filter = 'none';
         const data = ctx.getImageData(0, 0, w, h);
         const px = data.data;
         const gray = new Float32Array(w * h);
@@ -247,37 +259,92 @@ const barRects = bars.map((w, i) => {
         if (canvas.clientWidth) dither(canvas, img, canvas.dataset.crop!.split(',').map(Number), ASPECT);
       });
 
-      // Desktop: a little e-ink display beside the receipt shows the hovered project.
-      type Project = { name: string; host: string; image: string; crop: number[] };
-      const projects: Project[] = JSON.parse(document.getElementById('projects')!.textContent!);
+      // Desktop: an e-ink display beside the receipt. Hovering a project shows it;
+      // hovering "Now" shows Chicago, Optum and UIUC together as a collage.
+      type Slide = { name: string; host: string; image: string; crop?: number[]; fit?: string; tone?: string };
+      const projects: Slide[] = JSON.parse(document.getElementById('projects')!.textContent!);
+      type Collage = {
+        name: string;
+        credit: string;
+        items: { image: string; x: number; y: number; w: number; rotate: number; tone?: string }[];
+      };
+      const collage: Collage = JSON.parse(document.getElementById('now-collage')!.textContent!);
+
+      // Draw the collage at full size on a blank canvas, then dither it like any other image.
+      let collageCanvas: Promise<HTMLCanvasElement> | undefined;
+      function buildCollage() {
+        collageCanvas ??= Promise.all(collage.items.map((it) => load(it.image))).then((imgs) => {
+          const W = 1600, H = W / ASPECT;
+          const c = document.createElement('canvas');
+          c.width = W;
+          c.height = H;
+          const ctx = c.getContext('2d')!;
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, 0, W, H);
+          collage.items.forEach((it, i) => {
+            const img = imgs[i];
+            const w = it.w * W, h = (w * img.naturalHeight) / img.naturalWidth;
+            ctx.save();
+            ctx.translate(it.x * W, it.y * H);
+            ctx.rotate((it.rotate * Math.PI) / 180);
+            if (it.tone) ctx.filter = it.tone;
+            ctx.drawImage(img, -w / 2, -h / 2, w, h);
+            ctx.restore();
+          });
+          return c;
+        });
+        return collageCanvas;
+      }
       const display = document.querySelector<HTMLElement>('.display')!;
       const screen = display.querySelector<HTMLCanvasElement>('.display-canvas')!;
-      let shown = -1;
+      const nowSection = document.querySelector<HTMLElement>('.now')!;
+      const REFRESH_MS = 420;
+      let active = '';
+      let drawToken = 0;
 
-      async function show(i: number) {
-        if (i === shown || !display.offsetParent) return;
-        shown = i;
-        const p = projects[i];
-        const img = await load(p.image);
-        if (shown !== i) return;
-        // partial refresh: a quick inverted ghost, then the new image
+      async function render(slide: Slide | 'now', count: string) {
+        const token = ++drawToken;
+        const img = slide === 'now' ? await buildCollage() : await load(slide.image);
+        if (token !== drawToken) return;
+        // partial refresh: the old image inverts, then the new one is drawn
         display.classList.add('flicker');
         setTimeout(() => {
-          dither(screen, img, p.crop, ASPECT);
-          display.querySelector('.display-name')!.textContent = p.name;
-          display.querySelector('.display-host')!.textContent = p.host;
-          display.querySelector('.display-count')!.textContent = `${i + 1}/${projects.length}`;
+          if (token !== drawToken) return;
+          if (slide === 'now') {
+            dither(screen, img, undefined, ASPECT);
+            display.querySelector('.display-name')!.textContent = collage.name;
+            display.querySelector('.display-host')!.textContent = collage.credit;
+          } else {
+            dither(screen, img, slide.crop, ASPECT, SCALE, slide);
+            display.querySelector('.display-name')!.textContent = slide.name;
+            display.querySelector('.display-host')!.textContent = slide.host;
+          }
+          display.querySelector('.display-count')!.textContent = count;
           display.classList.remove('flicker');
-        }, 260);
-        document.querySelectorAll('.item').forEach((el, j) => el.classList.toggle('selected', j === i));
+        }, REFRESH_MS);
+      }
+
+      function select(key: string) {
+        if (key === active || !display.offsetParent) return;
+        active = key;
+        nowSection.classList.toggle('selected', key === 'now');
+        document.querySelectorAll('.item').forEach((el, j) => el.classList.toggle('selected', key === `p${j}`));
+        if (key === 'now') {
+          render('now', '');
+        } else {
+          const i = Number(key.slice(1));
+          render(projects[i], `${i + 1}/${projects.length}`);
+        }
       }
 
       document.querySelectorAll<HTMLElement>('.item').forEach((el) => {
-        const i = Number(el.dataset.index);
-        el.addEventListener('mouseenter', () => show(i));
-        el.addEventListener('focus', () => show(i));
+        const key = `p${el.dataset.index}`;
+        el.addEventListener('mouseenter', () => select(key));
+        el.addEventListener('focus', () => select(key));
       });
-      show(0);
+      nowSection.addEventListener('mouseenter', () => select('now'));
+      nowSection.addEventListener('focus', () => select('now'));
+      select('now');
 
       // Desktop: shrink everything slightly if the window is too short for the receipt.
       function fit() {
@@ -289,16 +356,16 @@ const barRects = bars.map((w, i) => {
       fit();
       addEventListener('resize', fit);
       addEventListener('resize', () => {
-        const i = shown;
-        shown = -1;
-        show(Math.max(i, 0));
+        const key = active || 'now';
+        active = '';
+        select(key);
       });
 
       // E-ink full refresh on load: inverted, black, white, then the page.
       const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
       const steps: [string, number][] = reduce
         ? [['done', 0]]
-        : [['invert', 380], ['black', 260], ['white', 260], ['black', 200], ['white', 300], ['done', 0]];
+        : [['invert', 650], ['black', 450], ['white', 450], ['black', 350], ['white', 500], ['done', 0]];
       let t = 0;
       for (const [state, ms] of steps) {
         setTimeout(() => {
@@ -429,6 +496,8 @@ const barRects = bars.map((w, i) => {
     .stars { margin: 1.25rem 0 1rem; }
     .barcode { margin-top: 0.75rem; height: 30px; }
     .item.selected { background: var(--ink); color: var(--paper); }
+    .now { padding: 0.5rem; margin: -0.5rem; outline: none; cursor: default; }
+    .now.selected { background: var(--ink); color: var(--paper); }
     .item.selected .host, .item.selected .leader { color: var(--paper); border-color: var(--paper); }
 
     .display {
