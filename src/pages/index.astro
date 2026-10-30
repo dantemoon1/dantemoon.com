@@ -43,12 +43,12 @@ const barRects = bars.map((w, i) => {
       <hr />
 
       <section>
-        <h2>In this edition</h2>
+        <h2>Items shipped</h2>
         <ol class="items">
           {
             projects.map((p, i) => (
               <li>
-                <a href={p.url} target="_blank" rel="noopener" class="item">
+                <a href={p.url} target="_blank" rel="noopener" class="item" data-index={i}>
                   <span class="row">
                     <span class="item-name">{String(i + 1).padStart(2, '0')} {p.name}</span>
                     <span class="leader" aria-hidden="true" />
@@ -62,6 +62,11 @@ const barRects = bars.map((w, i) => {
             ))
           }
         </ol>
+        <p class="total">
+          <span>Total items</span>
+          <span class="leader" aria-hidden="true"></span>
+          <span>{projects.length}</span>
+        </p>
       </section>
 
       <hr />
@@ -92,6 +97,17 @@ const barRects = bars.map((w, i) => {
         </svg>
       </footer>
     </main>
+
+    <figure class="display" aria-hidden="true">
+      <div class="screen">
+        <p class="now-showing">Now showing <span class="display-count"></span></p>
+        <canvas class="display-canvas"></canvas>
+        <p class="display-name"></p>
+        <p class="display-host"></p>
+      </div>
+    </figure>
+
+    <script type="application/json" id="projects" set:html={JSON.stringify(projects)} />
 
     <div class="flash" aria-hidden="true"></div>
 
@@ -151,10 +167,70 @@ const barRects = bars.map((w, i) => {
         ctx.putImageData(data, 0, 0);
       }
 
-      document.querySelectorAll<HTMLCanvasElement>('canvas.dither').forEach((canvas) => {
-        const img = new Image();
-        img.onload = () => dither(canvas, img);
-        img.src = canvas.dataset.src!;
+      const images = new Map<string, Promise<HTMLImageElement>>();
+      function load(src: string) {
+        if (!images.has(src)) {
+          images.set(src, new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.src = src;
+          }));
+        }
+        return images.get(src)!;
+      }
+
+      // Mobile: screenshots sit inline in the receipt.
+      document.querySelectorAll<HTMLCanvasElement>('canvas.dither').forEach(async (canvas) => {
+        const img = await load(canvas.dataset.src!);
+        if (canvas.clientWidth) dither(canvas, img);
+      });
+
+      // Desktop: a little e-ink display beside the receipt shows the hovered project.
+      type Project = { name: string; host: string; image: string; crop: number[] };
+      const projects: Project[] = JSON.parse(document.getElementById('projects')!.textContent!);
+      const display = document.querySelector<HTMLElement>('.display')!;
+      const screen = display.querySelector<HTMLCanvasElement>('.display-canvas')!;
+      let shown = -1;
+
+      async function show(i: number) {
+        if (i === shown || !display.offsetParent) return;
+        shown = i;
+        const p = projects[i];
+        const img = await load(p.image);
+        if (shown !== i) return;
+        // partial refresh: a quick inverted ghost, then the new image
+        display.classList.add('flicker');
+        setTimeout(() => {
+          screen.dataset.crop = p.crop.join(',');
+          dither(screen, img);
+          display.querySelector('.display-name')!.textContent = p.name;
+          display.querySelector('.display-host')!.textContent = p.host;
+          display.querySelector('.display-count')!.textContent = `${i + 1}/${projects.length}`;
+          display.classList.remove('flicker');
+        }, 120);
+        document.querySelectorAll('.item').forEach((el, j) => el.classList.toggle('selected', j === i));
+      }
+
+      document.querySelectorAll<HTMLElement>('.item').forEach((el) => {
+        const i = Number(el.dataset.index);
+        el.addEventListener('mouseenter', () => show(i));
+        el.addEventListener('focus', () => show(i));
+      });
+      show(0);
+
+      // Desktop: shrink everything slightly if the window is too short for the receipt.
+      function fit() {
+        document.body.style.zoom = '';
+        if (!display.offsetParent) return;
+        const h = document.querySelector<HTMLElement>(".receipt")!.offsetHeight + 96;
+        if (h > innerHeight) document.body.style.zoom = String(innerHeight / h);
+      }
+      fit();
+      addEventListener('resize', fit);
+      addEventListener('resize', () => {
+        const i = shown;
+        shown = -1;
+        show(Math.max(i, 0));
       });
 
       // E-ink full refresh on load: inverted, black, white, then the page.
@@ -251,6 +327,12 @@ const barRects = bars.map((w, i) => {
   .item:hover .host, .item:hover .leader { color: var(--paper); border-color: var(--paper); }
   .item:hover .dither { filter: invert(1); border-color: var(--paper); }
 
+  .total {
+    display: flex; align-items: baseline; gap: 0.5rem;
+    margin-top: 1.25rem; padding-top: 0.75rem; border-top: 1.5px dashed var(--faint);
+    font-weight: 600; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.08em;
+  }
+
   .contact { display: grid; grid-template-columns: 6rem 1fr; margin: 0; }
   .contact dt { color: var(--faint); }
   .contact dd { margin: 0; }
@@ -265,8 +347,48 @@ const barRects = bars.map((w, i) => {
   body[data-flash='invert'] { filter: invert(1); }
   body[data-flash='black'] .flash { background: #111; }
   body[data-flash='white'] .flash { background: #f4f3ef; }
-  body.refreshing .receipt { visibility: hidden; }
-  body[data-flash='invert'] .receipt { visibility: visible; }
+  body.refreshing :is(.receipt, .display) { visibility: hidden; }
+  body[data-flash='invert'] :is(.receipt, .display) { visibility: visible; }
+
+  .display { display: none; }
+
+  /* Desktop: text-only receipt with the e-ink display beside it */
+  @media (min-width: 1040px) {
+    body {
+      display: flex; align-items: center; justify-content: center; gap: 4rem;
+      padding: 2.5rem 2rem;
+    }
+    .receipt { margin: 0; padding: 1.75rem 2rem 1.5rem; max-width: none; width: 34rem; flex-shrink: 0; }
+    .receipt .dither, .receipt .host { display: none; }
+    .brand { margin-bottom: 0.75rem; }
+    .contact { display: flex; gap: 1.5rem; }
+    .contact dt { display: none; }
+    .items { gap: 1rem; }
+    hr { margin: 1.15rem 0; }
+    .stars { margin: 1.25rem 0 1rem; }
+    .barcode { margin-top: 0.75rem; height: 30px; }
+    .item.selected { background: var(--ink); color: var(--paper); }
+    .item.selected .host, .item.selected .leader { color: var(--paper); border-color: var(--paper); }
+
+    .display {
+      display: block; margin: 0; width: 28rem; flex-shrink: 0;
+      padding: 1.1rem; background: #ecebe6; border-radius: 10px;
+      box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08), 0 18px 40px -18px rgb(0 0 0 / 0.35);
+    }
+    .screen {
+      background: var(--paper); padding: 1.25rem; border-radius: 2px;
+      box-shadow: inset 0 1px 4px rgb(0 0 0 / 0.18);
+    }
+    .now-showing {
+      display: flex; justify-content: space-between;
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
+      border-bottom: 1.5px solid var(--ink); padding-bottom: 0.6rem; margin-bottom: 1rem;
+    }
+    .display-canvas { display: block; width: 100%; image-rendering: pixelated; border: 1.5px solid var(--ink); }
+    .display-name { font-weight: 600; font-size: 1.15rem; margin-top: 0.75rem; }
+    .display-host { color: var(--faint); font-size: 0.8rem; }
+    .display.flicker .screen { filter: invert(1); }
+  }
 
   @media (max-width: 480px) {
     body { padding: 1.5rem 0.75rem 3rem; }

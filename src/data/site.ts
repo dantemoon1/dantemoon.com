@@ -26,7 +26,7 @@ export const projects = [
     name: 'Lofi New Tab',
     url: 'https://github.com/dantemoon1/lofi-newtab',
     host: 'github.com/dantemoon1',
-    blurb: 'A calm new tab: lofi video, a clock, a pomodoro timer.',
+    blurb: 'A calm new tab: lofi video, clock, pomodoro.',
     image: '/shots/lofi.jpg',
     crop: [0, 0, 1, 1],
   },
