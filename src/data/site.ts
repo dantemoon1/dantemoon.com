@@ -9,9 +9,9 @@ export const site = {
 // x, y (center) and w are fractions of the display; rotate is in degrees.
 export const nowCollage = {
   name: 'Chicago · Optum · UIUC',
-  credit: 'Skyline photo: NorbertNagel, CC BY-SA 4.0',
+  credit: 'Home base, day job, school.',
   items: [
-    { image: '/now/chicago.jpg', x: 0.36, y: 0.5, w: 0.6, rotate: -3, tone: 'brightness(1.35) contrast(1.15)' },
+    { image: '/now/chicago.jpg', x: 0.37, y: 0.52, w: 0.68, rotate: -2 },
     { image: '/now/optum.png', x: 0.8, y: 0.26, w: 0.3, rotate: 4 },
     { image: '/now/illinois.png', x: 0.8, y: 0.7, w: 0.12, rotate: -6 },
   ],
