@@ -100,10 +100,7 @@ const barRects = bars.map((w, i) => {
 
     <figure class="display" aria-hidden="true">
       <div class="screen">
-        <p class="now-showing">Now showing <span class="display-count"></span></p>
         <canvas class="display-canvas"></canvas>
-        <p class="display-name"></p>
-        <p class="display-host"></p>
       </div>
     </figure>
 
@@ -262,8 +259,6 @@ const barRects = bars.map((w, i) => {
       type Slide = { name: string; host: string; image: string; crop?: number[]; fit?: string };
       const projects: Slide[] = JSON.parse(document.getElementById('projects')!.textContent!);
       type Collage = {
-        name: string;
-        credit: string;
         items: { image: string; x: number; y: number; w: number; rotate: number; invert?: boolean }[];
       };
       const collage: Collage = JSON.parse(document.getElementById('now-collage')!.textContent!);
@@ -315,7 +310,7 @@ const barRects = bars.map((w, i) => {
       let active = '';
       let drawToken = 0;
 
-      async function render(slide: Slide | 'now', count: string) {
+      async function render(slide: Slide | 'now') {
         const token = ++drawToken;
         const img = slide === 'now' ? await buildCollage() : await load(slide.image);
         if (token !== drawToken) return;
@@ -323,16 +318,8 @@ const barRects = bars.map((w, i) => {
         display.classList.add('flicker');
         setTimeout(() => {
           if (token !== drawToken) return;
-          if (slide === 'now') {
-            dither(screen, img, undefined, ASPECT);
-            display.querySelector('.display-name')!.textContent = collage.name;
-            display.querySelector('.display-host')!.textContent = collage.credit;
-          } else {
-            dither(screen, img, slide.crop, ASPECT, SCALE, slide);
-            display.querySelector('.display-name')!.textContent = slide.name;
-            display.querySelector('.display-host')!.textContent = slide.host;
-          }
-          display.querySelector('.display-count')!.textContent = count;
+          if (slide === 'now') dither(screen, img, undefined, ASPECT);
+          else dither(screen, img, slide.crop, ASPECT, SCALE, slide);
           display.classList.remove('flicker');
         }, REFRESH_MS);
       }
@@ -342,12 +329,7 @@ const barRects = bars.map((w, i) => {
         active = key;
         nowSection.classList.toggle('selected', key === 'now');
         document.querySelectorAll('.item').forEach((el, j) => el.classList.toggle('selected', key === `p${j}`));
-        if (key === 'now') {
-          render('now', '');
-        } else {
-          const i = Number(key.slice(1));
-          render(projects[i], `${i + 1}/${projects.length}`);
-        }
+        render(key === 'now' ? 'now' : projects[Number(key.slice(1))]);
       }
 
       document.querySelectorAll<HTMLElement>('.item').forEach((el) => {
@@ -522,14 +504,7 @@ const barRects = bars.map((w, i) => {
       background: var(--paper); padding: 1.25rem; border-radius: 2px;
       box-shadow: inset 0 1px 4px rgb(0 0 0 / 0.18);
     }
-    .now-showing {
-      display: flex; justify-content: space-between;
-      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase;
-      border-bottom: 1.5px solid var(--ink); padding-bottom: 0.6rem; margin-bottom: 1rem;
-    }
     .display-canvas { display: block; width: 100%; image-rendering: pixelated; border: 1.5px solid var(--ink); }
-    .display-name { font-weight: 600; font-size: 1.4rem; margin-top: 1rem; }
-    .display-host { color: var(--faint); font-size: 0.8rem; }
     .display.flicker .screen { filter: invert(1); }
   }
 

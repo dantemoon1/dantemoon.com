@@ -8,8 +8,6 @@ export const site = {
 // Hovering "Now" lays these out together on the display, like things pinned to a board.
 // x, y (center) and w are fractions of the display; rotate is in degrees.
 export const nowCollage = {
-  name: 'Chicago · Optum · UIUC',
-  credit: 'Home base, day job, school.',
   items: [
     { image: '/now/chicago-line.jpg', x: 0.37, y: 0.52, w: 0.66, rotate: -2 },
     { image: '/now/optum.png', x: 0.8, y: 0.26, w: 0.3, rotate: 4 },
