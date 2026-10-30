@@ -1,21 +1,19 @@
 ---
-import { site, loop, lines } from '../data/site';
+import '@fontsource/ibm-plex-mono/400.css';
+import '@fontsource/ibm-plex-mono/600.css';
+import { site, projects, contact } from '../data/site';
 
-const stops = {
-  loop: { name: loop.name, line: 'All lines', color: '#5b4636', blurb: loop.blurb },
-  ...Object.fromEntries(
-    lines.flatMap((l) =>
-      l.stations.map((s) => [s.id, { name: s.name, line: l.name, color: l.color, blurb: s.blurb, link: s.link }]),
-    ),
-  ),
-};
-
-const labelPos = {
-  right: { dx: 20, dy: 6, anchor: 'start' },
-  left: { dx: -20, dy: 6, anchor: 'end' },
-  above: { dx: 0, dy: -20, anchor: 'middle' },
-  below: { dx: 0, dy: 32, anchor: 'middle' },
-} as const;
+// A receipt-style barcode: bar widths come from the domain's characters.
+const bars = [...site.domain].flatMap((c) => {
+  const n = c.charCodeAt(0);
+  return [1 + (n % 3), 1 + ((n >> 2) % 2), 1 + ((n >> 3) % 3), 1];
+});
+let bx = 0;
+const barRects = bars.map((w, i) => {
+  const r = { x: bx, w, fill: i % 2 === 0 };
+  bx += w;
+  return r;
+});
 ---
 
 <html lang="en">
@@ -24,181 +22,255 @@ const labelPos = {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{site.name}</title>
-    <meta name="description" content={site.tagline} />
+    <meta name="description" content={site.description} />
   </head>
-  <body>
-    <header class="title">
-      <h1>{site.name}</h1>
-      <p>{site.tagline}</p>
-      <p class="hint">Click a stop to look around.</p>
-    </header>
+  <body class="refreshing">
+    <main class="receipt">
+      <header>
+        <p class="brand">{site.domain}</p>
+        <p>Thank you for stopping by.</p>
+        <p class="printed">Printed <span id="printed">today</span></p>
+      </header>
 
-    <svg class="map" viewBox="0 0 1000 720" preserveAspectRatio="xMidYMid meet" role="img" aria-label="A transit map of Dante's work">
-      <!-- Lake Michigan and the river sit under the tracks -->
-      <path class="water" d="M 830 0 C 805 140, 860 250, 815 380 S 785 610, 830 720 L 1000 720 L 1000 0 Z" />
-      <text class="lake-label" x="905" y="380" transform="rotate(90 905 380)">LAKE MICHIGAN</text>
-      <path class="river" d="M 822 300 L 480 300 C 455 300, 450 290, 430 270 L 330 170 L 330 0" />
-      <path class="river" d="M 480 300 C 455 300, 445 315, 445 340 L 445 720" />
+      <hr />
 
-      {lines.map((l) => <path class="track" data-line={l.id} d={l.path} stroke={l.color} />)}
+      <section>
+        <h2>Now</h2>
+        <p class="name">{site.name}</p>
+        <p>{site.now}</p>
+      </section>
 
-      <!-- The Loop -->
-      <g class="stop loop" data-stop="loop" tabindex="0" role="button" aria-label="The Loop: about me">
-        <rect class="loop-track" x="520" y="330" width="120" height="90" rx="14" />
-        <rect class="loop-inner" x="527" y="337" width="106" height="76" rx="9" />
-        <text class="loop-label" x="580" y="372">THE</text>
-        <text class="loop-label" x="580" y="392">LOOP</text>
-        <rect class="train" x="-9" y="-5" width="18" height="10" rx="3">
-          <animateMotion dur="9s" repeatCount="indefinite" rotate="auto" path="M 534 330 L 626 330 Q 640 330 640 344 L 640 406 Q 640 420 626 420 L 534 420 Q 520 420 520 406 L 520 344 Q 520 330 534 330 Z" />
-        </rect>
-      </g>
+      <hr />
 
-      {
-        lines.map((l) =>
-          l.stations.map((s) => {
-            const p = labelPos[s.label];
-            return (
-              <g class:list={['stop', { terminal: s.terminal }]} data-stop={s.id} data-line={l.id} tabindex="0" role="button" aria-label={s.name}>
-                <circle class="hit" cx={s.x} cy={s.y} r="24" />
-                <circle class="dot" cx={s.x} cy={s.y} r={s.terminal ? 11 : 8} stroke={s.terminal ? l.color : undefined} />
-                <text class="stop-label" x={s.x + p.dx} y={s.y + p.dy} text-anchor={p.anchor}>{s.name}</text>
-              </g>
-            );
-          }),
-        )
-      }
-    </svg>
-
-    <ul class="legend">
-      {lines.map((l) => <li><span style={`background:${l.color}`}></span>{l.name}</li>)}
-    </ul>
-
-    <aside class="card" hidden aria-live="polite">
-      <button class="close" aria-label="Close">×</button>
-      <p class="card-line"><span class="chip"></span><span class="line-name"></span></p>
-      <h2 class="card-name"></h2>
-      <p class="card-blurb"></p>
-      <a class="card-link" hidden></a>
-    </aside>
-
-    <script type="application/json" id="stops" set:html={JSON.stringify(stops)} />
-    <script>
-      type Stop = { name: string; line: string; color: string; blurb: string; link?: { label: string; url: string } };
-      const stops: Record<string, Stop> = JSON.parse(document.getElementById('stops')!.textContent!);
-      const card = document.querySelector<HTMLElement>('.card')!;
-      const q = <T extends HTMLElement>(sel: string) => card.querySelector<T>(sel)!;
-
-      function open(id: string) {
-        const s = stops[id];
-        q('.chip').style.background = s.color;
-        q('.line-name').textContent = s.line;
-        q('.card-name').textContent = s.name;
-        q('.card-blurb').textContent = s.blurb;
-        const a = q<HTMLAnchorElement>('.card-link');
-        a.hidden = !s.link;
-        if (s.link) {
-          a.href = s.link.url;
-          a.textContent = `${s.link.label} →`;
-          a.target = s.link.url.startsWith('mailto:') ? '' : '_blank';
-        }
-        card.style.setProperty('--line', s.color);
-        card.hidden = false;
-        document.querySelectorAll('.stop').forEach((el) => el.classList.toggle('active', el.getAttribute('data-stop') === id));
-      }
-
-      function close() {
-        card.hidden = true;
-        document.querySelectorAll('.stop.active').forEach((el) => el.classList.remove('active'));
-      }
-
-      document.querySelectorAll<SVGGElement>('.stop').forEach((el) => {
-        const id = el.dataset.stop!;
-        el.addEventListener('click', () => open(id));
-        el.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            open(id);
+      <section>
+        <h2>In this edition</h2>
+        <ol class="items">
+          {
+            projects.map((p, i) => (
+              <li>
+                <a href={p.url} target="_blank" rel="noopener" class="item">
+                  <span class="row">
+                    <span class="item-name">{String(i + 1).padStart(2, '0')} {p.name}</span>
+                    <span class="leader" aria-hidden="true" />
+                    <span class="go">↗</span>
+                  </span>
+                  <span class="blurb">{p.blurb}</span>
+                  <canvas class="dither" data-src={p.image} data-crop={p.crop.join(',')} aria-label={`Screenshot of ${p.name}`} role="img" />
+                  <span class="host">{p.host}</span>
+                </a>
+              </li>
+            ))
           }
-        });
+        </ol>
+      </section>
+
+      <hr />
+
+      <section>
+        <h2>Reach me</h2>
+        <dl class="contact">
+          {
+            contact.map((c) => (
+              <>
+                <dt>{c.label}</dt>
+                <dd>
+                  <a href={c.url}>{c.value}</a>
+                </dd>
+              </>
+            ))
+          }
+        </dl>
+      </section>
+
+      <p class="stars" aria-hidden="true">*&nbsp;&nbsp;&nbsp;*&nbsp;&nbsp;&nbsp;*</p>
+
+      <footer>
+        <p>Thank you for your business.</p>
+        <p>{site.domain}</p>
+        <svg class="barcode" viewBox={`0 0 ${bx} 10`} preserveAspectRatio="none" aria-hidden="true">
+          {barRects.filter((r) => r.fill).map((r) => <rect x={r.x} width={r.w} height="10" />)}
+        </svg>
+      </footer>
+    </main>
+
+    <div class="flash" aria-hidden="true"></div>
+
+    <script>
+      // "Printed" timestamp in Chicago time.
+      document.getElementById('printed')!.textContent = new Date().toLocaleString('en-US', {
+        timeZone: 'America/Chicago',
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      }) + ' CT';
+
+      // Atkinson dithering, the classic 1-bit look of e-ink and early Macs.
+      const INK = [42, 42, 40];
+      const PAPER = [226, 224, 217];
+      const SCALE = 1.5; // each dithered dot is SCALE css pixels
+
+      function dither(canvas: HTMLCanvasElement, img: HTMLImageElement) {
+        const [cx, cy, cw, ch] = canvas.dataset.crop!.split(',').map(Number);
+        const sx = cx * img.naturalWidth, sy = cy * img.naturalHeight;
+        const sw = cw * img.naturalWidth, sh = ch * img.naturalHeight;
+        const w = Math.round(canvas.clientWidth / SCALE);
+        const h = Math.round((w * sh) / sw);
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+        const data = ctx.getImageData(0, 0, w, h);
+        const px = data.data;
+        const gray = new Float32Array(w * h);
+        for (let i = 0; i < w * h; i++) {
+          gray[i] = 0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2];
+        }
+        const spread = [[1, 0], [2, 0], [-1, 1], [0, 1], [1, 1], [0, 2]];
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const i = y * w + x;
+            const out = gray[i] < 128 ? 0 : 255;
+            const err = (gray[i] - out) / 8;
+            gray[i] = out;
+            for (const [dx, dy] of spread) {
+              const nx = x + dx, ny = y + dy;
+              if (nx >= 0 && nx < w && ny < h) gray[ny * w + nx] += err;
+            }
+          }
+        }
+        for (let i = 0; i < w * h; i++) {
+          const c = gray[i] === 0 ? INK : PAPER;
+          px[i * 4] = c[0];
+          px[i * 4 + 1] = c[1];
+          px[i * 4 + 2] = c[2];
+          px[i * 4 + 3] = 255;
+        }
+        ctx.putImageData(data, 0, 0);
+      }
+
+      document.querySelectorAll<HTMLCanvasElement>('canvas.dither').forEach((canvas) => {
+        const img = new Image();
+        img.onload = () => dither(canvas, img);
+        img.src = canvas.dataset.src!;
       });
-      q('.close').addEventListener('click', close);
-      document.addEventListener('keydown', (e) => e.key === 'Escape' && close());
+
+      // E-ink full refresh on load: inverted, black, white, then the page.
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const steps: [string, number][] = reduce
+        ? [['done', 0]]
+        : [['invert', 140], ['black', 110], ['white', 110], ['done', 0]];
+      let t = 0;
+      for (const [state, ms] of steps) {
+        setTimeout(() => {
+          document.body.dataset.flash = state;
+          if (state === 'done') document.body.classList.remove('refreshing');
+        }, t);
+        t += ms;
+      }
     </script>
   </body>
 </html>
 
 <style is:global>
   :root {
-    --paper: #f3efe6;
-    --ink: #1d1c1a;
-    --muted: #6f6a60;
-    --water: #cfe1ee;
+    --panel: #d6d4cd;
+    --paper: #e2e0d9;
+    --ink: #2a2a28;
+    --faint: #6d6b65;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; }
-  body {
-    background: var(--paper);
+  html {
+    background: var(--panel);
     color: var(--ink);
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font: 15px/1.6 'IBM Plex Mono', ui-monospace, Menlo, monospace;
     -webkit-font-smoothing: antialiased;
-    overflow: hidden;
+  }
+  body { margin: 0; padding: 4rem 1rem 6rem; min-height: 100vh; }
+  p { margin: 0; }
+  a { color: inherit; text-decoration: none; }
+
+  .receipt {
+    max-width: 27rem;
+    margin: 0 auto;
+    padding: 2.5rem 2rem 2rem;
+    background: var(--paper);
+    box-shadow: 0 1px 0 rgb(0 0 0 / 0.06), 0 18px 40px -18px rgb(0 0 0 / 0.35);
+    /* torn bottom edge */
+    --tooth: 10px;
+    mask:
+      linear-gradient(#000 0 0) top / 100% calc(100% - var(--tooth)) no-repeat,
+      conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / calc(var(--tooth) * 2) var(--tooth) repeat-x;
   }
 
-  .title { position: fixed; top: 2rem; left: 2rem; z-index: 2; max-width: 22rem; }
-  .title h1 { margin: 0; font-size: 2.2rem; letter-spacing: -0.03em; line-height: 1; }
-  .title p { margin: 0.5rem 0 0; color: var(--muted); }
-  .title .hint { font-size: 0.85rem; }
-
-  .map { width: 100vw; height: 100vh; display: block; }
-  .water { fill: var(--water); }
-  .river { fill: none; stroke: var(--water); stroke-width: 9; stroke-linejoin: round; }
-  .lake-label { fill: #8fb0c6; font-size: 13px; letter-spacing: 0.4em; font-style: italic; text-anchor: middle; }
-
-  .track { fill: none; stroke-width: 10; stroke-linecap: round; stroke-linejoin: round; }
-
-  .loop-track { fill: none; stroke: #5b4636; stroke-width: 12; }
-  .loop-inner { fill: var(--paper); stroke: none; }
-  .loop-label { font-size: 13px; font-weight: 800; letter-spacing: 0.15em; text-anchor: middle; fill: #5b4636; }
-  .train { fill: #f2b705; stroke: var(--ink); stroke-width: 1.5; }
-
-  .stop { cursor: pointer; outline: none; }
-  .hit { fill: transparent; }
-  .dot { fill: #fff; stroke: var(--ink); stroke-width: 3.5; transition: r 0.15s; }
-  .terminal .dot { stroke-width: 5; }
-  .stop-label { font-size: 15px; font-weight: 700; fill: var(--ink); paint-order: stroke; stroke: var(--paper); stroke-width: 5px; }
-  .stop:hover .dot, .stop:focus-visible .dot, .stop.active .dot { r: 13; }
-  .stop:focus-visible .stop-label, .stop.active .stop-label { text-decoration: underline; }
-  .loop:hover .loop-track, .loop.active .loop-track { stroke: #3d2e22; }
-
-  .legend {
-    position: fixed; left: 2rem; bottom: 2rem; margin: 0; padding: 0.9rem 1.1rem;
-    list-style: none; background: #fff; border: 2px solid var(--ink); border-radius: 6px;
-    font-size: 0.85rem; font-weight: 700; display: grid; gap: 0.4rem;
+  header { text-align: center; }
+  .brand {
+    display: inline-block;
+    font-size: 1.5rem;
+    font-weight: 600;
+    padding: 0.6rem 1.4rem;
+    border: 1.5px dashed var(--faint);
+    border-radius: 4px;
+    margin-bottom: 1.25rem;
   }
-  .legend span { display: inline-block; width: 1.6rem; height: 0.45rem; border-radius: 2px; margin-right: 0.6rem; vertical-align: middle; }
+  .printed { color: var(--faint); font-size: 0.8rem; }
 
-  .card {
-    position: fixed; right: 2rem; top: 50%; transform: translateY(-50%);
-    width: min(22rem, calc(100vw - 2rem)); padding: 1.5rem;
-    background: #fff; border: 2px solid var(--ink); border-top: 10px solid var(--line, var(--ink));
-    border-radius: 6px; box-shadow: 0 10px 30px rgb(0 0 0 / 0.12); z-index: 3;
-    animation: slide 0.2s ease-out;
+  hr { border: 0; border-top: 1.5px solid var(--ink); margin: 1.5rem 0; }
+  h2 {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin: 0 0 0.75rem;
   }
-  .card[hidden] { display: none; }
-  @keyframes slide { from { opacity: 0; transform: translate(12px, -50%); } }
-  .card-line { margin: 0; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
-  .chip { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 50%; margin-right: 0.5rem; vertical-align: -1px; }
-  .card-name { margin: 0.5rem 0 0.75rem; font-size: 1.6rem; letter-spacing: -0.02em; }
-  .card-blurb { margin: 0 0 1rem; line-height: 1.55; }
-  .card-link { color: var(--ink); font-weight: 700; text-decoration-color: var(--line); text-decoration-thickness: 3px; text-underline-offset: 4px; }
-  .close { position: absolute; top: 0.6rem; right: 0.8rem; border: 0; background: none; font-size: 1.5rem; cursor: pointer; color: var(--muted); }
+  .name { font-size: 1.35rem; font-weight: 600; }
 
-  @media (max-width: 700px) {
-    body { overflow: auto; }
-    .title { position: static; padding: 1.5rem 1.5rem 0; }
-    .map { height: auto; min-height: 60vh; }
-    .legend { position: static; margin: 0 1.5rem 1.5rem; }
-    .card { top: auto; bottom: 1rem; right: 1rem; left: 1rem; width: auto; transform: none; }
-    @keyframes slide { from { opacity: 0; transform: translateY(12px); } }
+  .items { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.5rem; }
+  .item { display: block; padding: 0.5rem; margin: -0.5rem; }
+  .row { display: flex; align-items: baseline; gap: 0.5rem; }
+  .item-name { font-weight: 600; font-size: 1.05rem; white-space: nowrap; }
+  .leader { flex: 1; border-bottom: 2px dotted var(--faint); transform: translateY(-0.3em); }
+  .blurb, .host { display: block; }
+  .host { color: var(--faint); font-size: 0.8rem; }
+  .dither {
+    display: block;
+    width: 100%;
+    margin: 0.6rem 0 0.3rem;
+    image-rendering: pixelated;
+    border: 1.5px solid var(--ink);
+  }
+
+  /* e-ink style hover: a hard inversion, no easing */
+  .item:hover, .item:focus-visible, .contact a:hover, .contact a:focus-visible {
+    background: var(--ink);
+    color: var(--paper);
+    outline: none;
+  }
+  .item:hover .host, .item:hover .leader { color: var(--paper); border-color: var(--paper); }
+  .item:hover .dither { filter: invert(1); border-color: var(--paper); }
+
+  .contact { display: grid; grid-template-columns: 6rem 1fr; margin: 0; }
+  .contact dt { color: var(--faint); }
+  .contact dd { margin: 0; }
+  .contact a { text-decoration: underline; text-underline-offset: 3px; }
+
+  .stars { text-align: center; margin: 2rem 0 1.5rem; font-size: 1.1rem; }
+  footer { text-align: center; }
+  .barcode { width: 70%; height: 44px; margin: 1.5rem auto 0.5rem; display: block; fill: var(--ink); }
+
+  /* the refresh flash */
+  .flash { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+  body[data-flash='invert'] { filter: invert(1); }
+  body[data-flash='black'] .flash { background: #111; }
+  body[data-flash='white'] .flash { background: #f4f3ef; }
+  body.refreshing .receipt { visibility: hidden; }
+  body[data-flash='invert'] .receipt { visibility: visible; }
+
+  @media (max-width: 480px) {
+    body { padding: 1.5rem 0.75rem 3rem; }
+    .receipt { padding: 2rem 1.25rem 1.5rem; }
+    .contact { grid-template-columns: 5rem 1fr; }
   }
 </style>
