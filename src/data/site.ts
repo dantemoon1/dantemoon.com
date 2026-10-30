@@ -11,7 +11,7 @@ export const nowCollage = {
   name: 'Chicago · Optum · UIUC',
   credit: 'Home base, day job, school.',
   items: [
-    { image: '/now/chicago.jpg', x: 0.37, y: 0.52, w: 0.68, rotate: -2 },
+    { image: '/now/chicago-line.jpg', x: 0.37, y: 0.52, w: 0.66, rotate: -2 },
     { image: '/now/optum.png', x: 0.8, y: 0.26, w: 0.3, rotate: 4 },
     { image: '/now/illinois.png', x: 0.8, y: 0.7, w: 0.12, rotate: -6 },
   ],

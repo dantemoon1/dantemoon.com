@@ -138,7 +138,7 @@ const barRects = bars.map((w, i) => {
         crop = [0, 0, 1, 1],
         aspect?: number,
         scale = SCALE,
-        opts: { fit?: string; tone?: string } = {},
+        opts: { fit?: string } = {},
       ) {
         const iw = img instanceof HTMLImageElement ? img.naturalWidth : img.width;
         const ih = img instanceof HTMLImageElement ? img.naturalHeight : img.height;
@@ -164,7 +164,6 @@ const barRects = bars.map((w, i) => {
         const ctx = canvas.getContext('2d')!;
         ctx.fillStyle = '#fff';
         ctx.fillRect(0, 0, w, h);
-        if (opts.tone) ctx.filter = opts.tone;
         if (opts.fit === 'contain') {
           // a logo: whole, centered, with room around it
           const k = Math.min((w * 0.7) / iw, (h * 0.7) / ih);
@@ -172,7 +171,6 @@ const barRects = bars.map((w, i) => {
         } else {
           ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
         }
-        ctx.filter = 'none';
         const data = ctx.getImageData(0, 0, w, h);
         const px = data.data;
         const gray = new Float32Array(w * h);
@@ -261,12 +259,12 @@ const barRects = bars.map((w, i) => {
 
       // Desktop: an e-ink display beside the receipt. Hovering a project shows it;
       // hovering "Now" shows Chicago, Optum and UIUC together as a collage.
-      type Slide = { name: string; host: string; image: string; crop?: number[]; fit?: string; tone?: string };
+      type Slide = { name: string; host: string; image: string; crop?: number[]; fit?: string };
       const projects: Slide[] = JSON.parse(document.getElementById('projects')!.textContent!);
       type Collage = {
         name: string;
         credit: string;
-        items: { image: string; x: number; y: number; w: number; rotate: number; tone?: string }[];
+        items: { image: string; x: number; y: number; w: number; rotate: number; invert?: boolean }[];
       };
       const collage: Collage = JSON.parse(document.getElementById('now-collage')!.textContent!);
 
@@ -283,12 +281,27 @@ const barRects = bars.map((w, i) => {
           ctx.fillRect(0, 0, W, H);
           collage.items.forEach((it, i) => {
             const img = imgs[i];
-            const w = it.w * W, h = (w * img.naturalHeight) / img.naturalWidth;
+            const w = Math.round(it.w * W), h = Math.round((w * img.naturalHeight) / img.naturalWidth);
+            // draw each piece on its own canvas first so it can be inverted
+            // (done by hand: Safari has no canvas filters)
+            const piece = document.createElement('canvas');
+            piece.width = w;
+            piece.height = h;
+            const pctx = piece.getContext('2d')!;
+            pctx.drawImage(img, 0, 0, w, h);
+            if (it.invert) {
+              const d = pctx.getImageData(0, 0, w, h);
+              for (let j = 0; j < d.data.length; j += 4) {
+                d.data[j] = 255 - d.data[j];
+                d.data[j + 1] = 255 - d.data[j + 1];
+                d.data[j + 2] = 255 - d.data[j + 2];
+              }
+              pctx.putImageData(d, 0, 0);
+            }
             ctx.save();
             ctx.translate(it.x * W, it.y * H);
             ctx.rotate((it.rotate * Math.PI) / 180);
-            if (it.tone) ctx.filter = it.tone;
-            ctx.drawImage(img, -w / 2, -h / 2, w, h);
+            ctx.drawImage(piece, -w / 2, -h / 2);
             ctx.restore();
           });
           return c;
